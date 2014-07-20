@@ -14,6 +14,8 @@ use attributes and methods of that object to obtain the data.
 
 =head1 SYNOPSIS
 
+Look at the source code of dta2csv and dta2sql for working code examples.
+
 =head2 Open a .dta file
 
     open my $fileHandle, '<', 'test.dta';
@@ -44,14 +46,12 @@ Variable names and types:
 =head1 SOURCES
 
 Stata .dta format specification from:
-    http://www.stata.com/help.cgi?dta
+    http://www.stata.com/help.cgi?dta_114
     http://www.stata.com/help.cgi?dta_113
 
 =head1 BUGS
 
 It works for me, but has not been fully tested.
-Versions prior to 0.7 had serious errors in converting some data types.
-There are probably some similar bugs left.
 
 All Stata missing values will be converted into a perl undef,
 losing the information about the type of missing value.
@@ -62,14 +62,12 @@ This code comes with ABSOLUTELY NO WARRANTY of any kind.
 
 =head1 AUTHOR
 
-Written by Franck Latremoliere.
-Copyright (c) 2007, 2008 Reckon LLP.
+Copyright 2007, 2008, 2014 Reckon LLP and Franck Latrémolière.
 L<http://www.reckon.co.uk/staff/franck/>
 
 =head1 LICENCE
 
-This program is free software; you can use, redistribute and/or modify it under the same terms as Perl itself
-(Artistic Licence or GNU GPL).
+This is free software; you can redistribute it and/or modify it under the same terms as Perl.
 
 =cut
 
@@ -79,15 +77,15 @@ use Carp;
 
 BEGIN {
 
-    $Parse::Stata::DtaReader::VERSION = '0.681';
+    $Parse::Stata::DtaReader::VERSION = '0.711';
 
 # test for float endianness using little-endian 33 33 3b f3, which is a float code for 1.4
 
     my $testFloat = unpack( 'f', pack( 'h*', 'f33b3333' ) );
-    $Parse::Stata::DtaReader::byteOrder = 1 # big-endian
+    $Parse::Stata::DtaReader::byteOrder = 1    # big-endian
       if ( 2.0 * $testFloat > 2.7 && 2.0 * $testFloat < 2.9 );
     $testFloat = unpack( 'f', pack( 'h*', '33333bf3' ) );
-    $Parse::Stata::DtaReader::byteOrder = 2 # little-endian
+    $Parse::Stata::DtaReader::byteOrder = 2    # little-endian
       if ( 2.0 * $testFloat > 2.7 && 2.0 * $testFloat < 2.9 );
     warn "Unable to detect endianness of float storage on your machine"
       unless $Parse::Stata::DtaReader::byteOrder;
@@ -121,8 +119,8 @@ sub readHeader($) {
     ( $self->{ds_format}, $self->{byteorder}, $self->{filetype}, $_ ) =
       unpack( 'CCCC', $_ );
     read $self->{fh}, $_, 105;
-    ( $self->{nvar}, $self->{nobs}, $self->{data_label}, $self->{time_stamp} ) =
-      unpack( ( $self->{byteorder} == 2 ? 'vV' : 'nN' ) . 'A81A18', $_ );
+    ( $self->{nvar}, $self->{nobs}, $self->{data_label}, $self->{time_stamp} )
+      = unpack( ( $self->{byteorder} == 2 ? 'vV' : 'nN' ) . 'A81A18', $_ );
     $self->{data_label} =~ s/\x00.*$//s;
     $self->{time_stamp} =~ s/\x00.*$//s;
 }
@@ -208,7 +206,7 @@ sub prepareDataReader($) {
 
 sub hasNext($) {
     my $self = shift;
-    return $self->{nextRow} > $self->{nobs} ? undef: $self->{nextRow};
+    return $self->{nextRow} > $self->{nobs} ? undef : $self->{nextRow};
 }
 
 sub readRow($) {
@@ -222,12 +220,16 @@ sub readRow($) {
         if ( defined $a[$i] ) {
             if ( $self->{byteorder} != $Parse::Stata::DtaReader::byteOrder ) {
                 if ( $t == 254 ) {
-                    $a[$i] = unpack( 'f', pack( 'N', ( unpack( 'V', pack('H8',$a[$i] )) ) ) );
+                    $a[$i] =
+                      unpack( 'f',
+                        pack( 'N', ( unpack( 'V', pack( 'H8', $a[$i] ) ) ) ) );
                 }
                 elsif ( $t == 255 ) {
-                    $a[$i] =
-                      unpack( 'd',
-                        pack( 'NN', reverse( unpack( 'VV', pack('H16',$a[$i]) ) ) ) );
+                    $a[$i] = unpack(
+                        'd',
+                        pack( 'NN',
+                            reverse( unpack( 'VV', pack( 'H16', $a[$i] ) ) ) )
+                    );
                 }
             }
             if ( $t < 245 ) {
@@ -245,10 +247,13 @@ sub readRow($) {
                 undef $a[$i] if $a[$i] > 2147483620 && $a[$i] < 2147483648;
             }
             elsif ( $t == 254 ) {
-                undef $a[$i] if defined $a[$i] and $a[$i] > 1.701e38 || $a[$i] < -1.701e38;
+                undef $a[$i]
+                  if defined $a[$i] and $a[$i] > 1.701e38 || $a[$i] < -1.701e38;
             }
             elsif ( $t == 255 ) {
-                undef $a[$i] if defined $a[$i] and $a[$i] > 8.988e307 || $a[$i] < -1.798e308;
+                undef $a[$i]
+                  if defined $a[$i]
+                  and $a[$i] > 8.988e307 || $a[$i] < -1.798e308;
             }
         }
     }

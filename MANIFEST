@@ -10,3 +10,4 @@ t/t1.dta
 t/t2.dta
 t/t3.dta
 META.yml                                 Module meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)
